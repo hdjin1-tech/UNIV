@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2027학년도 수시 지원 대학 및 시간대별 경쟁률</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #FAFAFA; }
+    </style>
+</head>
+<body class="text-gray-800 font-sans min-h-screen py-10 px-4 md:px-10">
+
+    <div class="max-w-6xl mx-auto space-y-8">
+        <!-- 헤더 영역 -->
+        <header class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <span class="text-xs font-semibold tracking-wider text-indigo-600 uppercase bg-indigo-50 px-3 py-1 rounded-full">2027 수시 원서 지원 전략</span>
+                <h1 class="text-2xl md:text-3xl font-bold text-gray-900 mt-2">대학·학과 시간대별 경쟁률 및 3개년 분석</h1>
+                <p class="text-sm text-gray-500 mt-1">과년도 입시 결과 비교 및 2027학년도 실시간 경쟁률 추이를 한눈에 확인하세요.</p>
+            </div>
+            <div>
+                <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-3 rounded-xl transition shadow-sm flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    지원 대학/학과 추가
+                </button>
+            </div>
+        </header>
+
+        <!-- 메인 컨텐츠 그리드 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- 좌측: 등록된 대학 리스트 -->
+            <div class="lg:col-span-1 space-y-4">
+                <h2 class="text-lg font-bold text-gray-800 px-1">지원 관리 목록</h2>
+                <div id="univ-list" class="space-y-4">
+                    <!-- 자바스크립트로 동적 생성됨 -->
+                </div>
+            </div>
+
+            <!-- 우측: 상세 정보 및 그래프 영역 -->
+            <div class="lg:col-span-2 space-y-8">
+                <!-- 선택된 대학 상세 정보 카드 -->
+                <div id="detail-card" class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 space-y-6">
+                    <div class="text-center py-12 text-gray-400">
+                        <p>좌측에서 대학을 선택하거나 새로운 대학을 추가해주세요.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 대학/학과 추가 및 수정 모달 -->
+    <div id="univ-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl max-w-2xl w-full p-8 shadow-xl max-h-[90vh] overflow-y-auto space-y-6">
+            <div class="flex justify-between items-center border-b pb-4">
+                <h3 id="modal-title" class="text-xl font-bold text-gray-900">새 지원 대학 등록</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+            </div>
+
+            <form id="univ-form" onsubmit="handleFormSubmit(event)" class="space-y-6">
+                <input type="hidden" id="edit-id">
+                <!-- 기본 정보 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">대학교명</label>
+                        <input type="text" id="univ-name" required placeholder="예: 한국대학교" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">전형명</label>
+                        <input type="text" id="univ-type" required placeholder="예: 학생부교과(교과우수자)" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">학과명</label>
+                        <input type="text" id="univ-major" required placeholder="예: 컴퓨터공학과" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <!-- 3개년 (2024~2026) 데이터 -->
+                <div>
+                    <h4 class="text-sm font-bold text-gray-700 mb-3">3개년 입시 결과 및 경쟁률</h4>
+                    <div class="grid grid-cols-4 gap-2 text-center text-xs font-semibold text-gray-500 mb-2">
+                        <div>연도</div>
+                        <div>모집인원</div>
+                        <div>최종 경쟁률</div>
+                        <div>입결 등급</div>
+                    </div>
+                    <div class="space-y-2">
+                        <!-- 2024 -->
+                        <div class="grid grid-cols-4 gap-2 items-center">
+                            <span class="text-sm font-medium text-gray-600 text-center">2024</span>
+                            <input type="number" id="q-2024" placeholder="모집" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                            <input type="number" step="0.01" id="r-2024" placeholder="경쟁률" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                            <input type="number" step="0.01" id="g-2024" placeholder="등급" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                        </div>
+                        <!-- 2025 -->
+                        <div class="grid grid-cols-4 gap-2 items-center">
+                            <span class="text-sm font-medium text-gray-600 text-center">2025</span>
+                            <input type="number" id="q-2025" placeholder="모집" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                            <input type="number" step="0.01" id="r-2025" placeholder="경쟁률" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                            <input type="number" step="0.01" id="g-2025" placeholder="등급" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                        </div>
+                        <!-- 2026 -->
+                        <div class="grid grid-cols-4 gap-2 items-center">
+                            <span class="text-sm font-medium text-gray-600 text-center">2026</span>
+                            <input type="number" id="q-2026" placeholder="모집" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                            <input type="number" step="0.01" id="r-2026" placeholder="경쟁률" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                            <input type="number" step="0.01" id="g-2026" placeholder="등급" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t">
+                    <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-medium hover:bg-gray-50 transition">취소</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition">저장하기</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 자바스크립트 로직 -->
+    <script>
+        // 기본 예시 데이터
+        let universities = JSON.parse(localStorage.getItem('univ_data')) || [
+            {
+                id: 1,
+                name: '한국대',
+                type: '학생부교과',
+                major: '컴퓨터공학과',
+                history: {
+                    2024: { quota: 15, rate: 14.2, grade: 2.1 },
+                    2025: { quota: 15, rate: 16.8, grade: 1.9 },
+                    2026: { quota: 18, rate: 21.4, grade: 2.0 }
+                },
+                // 2027 시간대별 경쟁률 (9/7 09:00 ~ 9/11 18:00, 3시간 간격 기본 슬롯)
+                rates2027: generateDefaultTimeslots()
+            }
+        ];
+
+        let selectedId = universities.length > 0 ? universities[0].id : null;
+        let chartInstance = null;
+
+        function generateDefaultTimeslots() {
+            const slots = [];
+            const dates = ['09/07', '09/08', '09/09', '09/10', '09/11'];
+            const hours = ['09:00', '12:00', '15:00', '18:00', '21:00'];
+            
+            dates.forEach(date => {
+                hours.forEach(hour => {
+                    if(date === '09/11' && hour > '18:00') return;
+                    if(date !== '09/11' || hour <= '18:00') {
+                        slots.push({ time: `${date} ${hour}`, rate: '' });
+                    }
+                });
+            });
+            return slots;
+        }
+
+        function saveToStorage() {
+            localStorage.setItem('univ_data', JSON.stringify(universities));
+        }
+
+        function renderList() {
+            const listEl = document.getElementById('univ-list');
+            if (universities.length === 0) {
+                listEl.innerHTML = `<div class="bg-white p-6 rounded-2xl border border-gray-100 text-center text-gray-400 text-sm">등록된 대학이 없습니다.</div>`;
+                return;
+            }
+
+            listEl.innerHTML = universities.map(u => `
+                <div onclick="selectUniv(${u.id})" class="bg-white p-5 rounded-2xl border ${u.id === selectedId ? 'border-indigo-600 ring-2 ring-indigo-50/50' : 'border-gray-100 hover:border-gray-200'} cursor-pointer transition shadow-sm space-y-2">
+                    <div class="flex justify-between items-start">
+                        <span class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full">${u.type}</span>
+                        <div class="flex gap-2">
+                            <button onclick="event.stopPropagation(); editUniv(${u.id})" class="text-gray-400 hover:text-gray-600 text-xs">수정</button>
+                            <button onclick="event.stopPropagation(); deleteUniv(${u.id})" class="text-red-400 hover:text-red-600 text-xs">삭제</button>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-900 text-lg">${u.name}</h3>
+                        <p class="text-sm text-gray-500">${u.major}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderDetail() {
+            const detailEl = document.getElementById('detail-card');
+            const u = universities.find(item => item.id === selectedId);
+
+            if (!u) {
+                detailEl.innerHTML = `<div class="text-center py-12 text-gray-400"><p>대학을 선택해주세요.</p></div>`;
+                if(chartInstance) chartInstance.destroy();
+                return;
+            }
+
+            detailEl.innerHTML = `
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-6 gap-4">
+                    <div>
+                        <span class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">${u.type}</span>
+                        <h2 class="text-2xl font-bold text-gray-900 mt-2">${u.name} - ${u.major}</h2>
+                    </div>
+                </div>
+
+                <!-- 3개년 결과 요약 테이블 -->
+                <div>
+                    <h3 class="text-sm font-bold text-gray-700 mb-3">3개년 입시 결과 요약</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-center text-sm border-collapse">
+                            <thead>
+                                <tr class="bg-gray-50 text-gray-500 text-xs">
+                                    <th class="p-3 rounded-l-xl">연도</th>
+                                    <th class="p-3">모집인원</th>
+                                    <th class="p-3">최종 경쟁률</th>
+                                    <th class="p-3 rounded-r-xl">입결 등급</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                ${[2024, 2025, 2026].map(yr => `
+                                    <tr>
+                                        <td class="p-3 font-medium text-gray-700">${yr}학년도</td>
+                                        <td class="p-3 text-gray-600">${u.history[yr].quota ? u.history[yr].quota + '명' : '-'}</td>
+                                        <td class="p-3 font-semibold text-indigo-600">${u.history[yr].rate ? u.history[yr].rate + ':1' : '-'}</td>
+                                        <td class="p-3 text-gray-600">${u.history[yr].grade ? u.history[yr].grade + '등급' : '-'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 그래프 영역 -->
+                <div class="space-y-3 pt-4 border-t">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-sm font-bold text-gray-700">2027 시간대별 경쟁률 추이 및 3개년 비교</h3>
+                        <span class="text-xs text-gray-400">접수기간: 9/7 ~ 9/11</span>
+                    </div>
+                    <div class="bg-gray-50/50 p-4 rounded-2xl border border-gray-100 relative h-80">
+                        <canvas id="rateChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 2027 시간대별 경쟁률 직접 입력 (3시간 간격) -->
+                <div class="space-y-4 pt-4 border-t">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-sm font-bold text-gray-700">2027 시간대별 경쟁률 입력 (3시간 간격)</h3>
+                        <button onclick="addCustomSlot()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg font-medium transition">+ 시간대 추가</button>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-60 overflow-y-auto p-1">
+                        ${u.rates2027.map((slot, index) => `
+                            <div class="bg-gray-50 border border-gray-200 p-3 rounded-xl flex flex-col gap-1">
+                                <div class="flex justify-between items-center text-xs text-gray-500 font-medium">
+                                    <span>${slot.time}</span>
+                                    <button onclick="removeSlot(${index})" class="text-red-400 hover:text-red-600">&times;</button>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <input type="number" step="0.01" value="${slot.rate}" onchange="updateRate2027(${index}, this.value)" placeholder="경쟁률 입력" class="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm text-center focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                                    <span class="text-xs text-gray-400">:1</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+
+            renderChart(u);
+        }
+
+        function renderChart(u) {
+            const ctx = document.getElementById('rateChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+
+            const labels = u.rates2027.map(s => s.time);
+            const data2027 = u.rates2027.map(s => s.rate ? parseFloat(s.rate) : null);
+
+            // 3개년 최종 경쟁률 데이터 (2024, 2025, 2026 각각 고유하고 진한 색상 적용)
+            const final2024 = u.history[2024].rate || 0;
+            const final2025 = u.history[2025].rate || 0;
+            const final2026 = u.history[2026].rate || 0;
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '2027 현재 경쟁률',
+                            data: data2027,
+                            borderColor: '#4f46e5', // 진한 인디고 (메인)
+                            backgroundColor: '#4f46e5',
+                            borderWidth: 3.5,
+                            tension: 0.2,
+                            spanGaps: true,
+                        },
+                        {
+                            label: '2026 최종 (' + final2026 + ':1)',
+                            data: Array(labels.length).fill(final2026),
+                            borderColor: '#ef4444', // 진한 레드
+                            borderDash: [6, 6],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                        },
+                        {
+                            label: '2025 최종 (' + final2025 + ':1)',
+                            data: Array(labels.length).fill(final2025),
+                            borderColor: '#f59e0b', // 진한 앰버(오렌지)
+                            borderDash: [6, 6],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                        },
+                        {
+                            label: '2024 최종 (' + final2024 + ':1)',
+                            data: Array(labels.length).fill(final2024),
+                            borderColor: '#10b981', // 진한 에메랄드(초록)
+                            borderDash: [6, 6],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#f3f4f6' }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { font: { size: 12 }, boxWidth: 16 }
+                        }
+                    }
+                }
+            });
+        }
+
+        function selectUniv(id) {
+            selectedId = id;
+            renderList();
+            renderDetail();
+        }
+
+        function openModal(editMode = false) {
+            document.getElementById('univ-modal').classList.remove('hidden');
+            document.getElementById('univ-modal').classList.add('flex');
+            if(!editMode) {
+                document.getElementById('modal-title').innerText = '새 지원 대학 등록';
+                document.getElementById('univ-form').reset();
+                document.getElementById('edit-id').value = '';
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('univ-modal').classList.remove('flex');
+            document.getElementById('univ-modal').classList.add('hidden');
+        }
+
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            const editId = document.getElementById('edit-id').value;
+            const name = document.getElementById('univ-name').value;
+            const type = document.getElementById('univ-type').value;
+            const major = document.getElementById('univ-major').value;
+
+            const history = {
+                2024: { quota: document.getElementById('q-2024').value, rate: document.getElementById('r-2024').value, grade: document.getElementById('g-2024').value },
+                2025: { quota: document.getElementById('q-2025').value, rate: document.getElementById('r-2025').value, grade: document.getElementById('g-2025').value },
+                2026: { quota: document.getElementById('q-2026').value, rate: document.getElementById('r-2026').value, grade: document.getElementById('g-2026').value },
+            };
+
+            if (editId) {
+                const u = universities.find(item => item.id == editId);
+                u.name = name;
+                u.type = type;
+                u.major = major;
+                u.history = history;
+            } else {
+                const newUniv = {
+                    id: Date.now(),
+                    name, type, major, history,
+                    rates2027: generateDefaultTimeslots()
+                };
+                universities.push(newUniv);
+                selectedId = newUniv.id;
+            }
+
+            saveToStorage();
+            renderList();
+            renderDetail();
+            closeModal();
+        }
+
+        function editUniv(id) {
+            const u = universities.find(item => item.id === id);
+            if(!u) return;
+
+            document.getElementById('modal-title').innerText = '지원 대학 정보 수정';
+            document.getElementById('edit-id').value = u.id;
+            document.getElementById('univ-name').value = u.name;
+            document.getElementById('univ-type').value = u.type;
+            document.getElementById('univ-major').value = u.major;
+
+            [2024, 2025, 2026].forEach(yr => {
+                document.getElementById(`q-${yr}`).value = u.history[yr].quota || '';
+                document.getElementById(`r-${yr}`).value = u.history[yr].rate || '';
+                document.getElementById(`g-${yr}`).value = u.history[yr].grade || '';
+            });
+
+            openModal(true);
+        }
+
+        function deleteUniv(id) {
+            if(confirm('정말 삭제하시겠습니까?')) {
+                universities = universities.filter(item => item.id !== id);
+                if(selectedId === id) {
+                    selectedId = universities.length > 0 ? universities[0].id : null;
+                }
+                saveToStorage();
+                renderList();
+                renderDetail();
+            }
+        }
+
+        function updateRate2027(index, value) {
+            const u = universities.find(item => item.id === selectedId);
+            if(u) {
+                u.rates2027[index].rate = value;
+                saveToStorage();
+                renderChart(u);
+            }
+        }
+
+        function addCustomSlot() {
+            const u = universities.find(item => item.id === selectedId);
+            if(u) {
+                const timeInput = prompt("추가할 일자 및 시간대를 입력하세요 (예: 09/11 21:00):");
+                if(timeInput) {
+                    u.rates2027.push({ time: timeInput, rate: '' });
+                    saveToStorage();
+                    renderDetail();
+                }
+            }
+        }
+
+        function removeSlot(index) {
+            const u = universities.find(item => item.id === selectedId);
+            if(u) {
+                u.rates2027.splice(index, 1);
+                saveToStorage();
+                renderDetail();
+            }
+        }
+
+        // 초기 렌더링 실행
+        renderList();
+        renderDetail();
+    </script>
+</body>
+</html>
