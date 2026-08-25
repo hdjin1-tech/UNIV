@@ -10,11 +10,16 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { background-color: #FAFAFA; }
+        /* 스크롤바 디자인 (일자별 세로 스크롤용) */
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 4px; }
+        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: #D1D5DB; }
     </style>
 </head>
 <body class="text-gray-800 font-sans min-h-screen py-10 px-4 md:px-10">
 
-    <div class="max-w-6xl mx-auto space-y-8">
+    <div class="max-w-7xl mx-auto space-y-8">
         <!-- 헤더 영역 -->
         <header class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
@@ -22,7 +27,18 @@
                 <h1 class="text-2xl md:text-3xl font-bold text-gray-900 mt-2">대학·학과 시간대별 경쟁률 및 3개년 분석</h1>
                 <p class="text-sm text-gray-500 mt-1">과년도 입시 결과 비교 및 2027학년도 실시간 경쟁률 추이를 한눈에 확인하세요.</p>
             </div>
-            <div>
+            <div class="flex flex-wrap gap-2 items-center">
+                <!-- PC 백업 및 불러오기 버튼 -->
+                <button onclick="exportDataFile()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-3 rounded-xl transition shadow-sm text-sm flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    PC 백업하기
+                </button>
+                <label class="bg-amber-600 hover:bg-amber-700 text-white font-medium px-4 py-3 rounded-xl transition shadow-sm text-sm cursor-pointer flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    데이터 불러오기
+                    <input type="file" accept=".json" onchange="importDataFile(event)" class="hidden">
+                </label>
+                
                 <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-3 rounded-xl transition shadow-sm flex items-center gap-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                     지원 대학/학과 추가
@@ -35,7 +51,7 @@
             <!-- 좌측: 등록된 대학 리스트 -->
             <div class="lg:col-span-1 space-y-4">
                 <h2 class="text-lg font-bold text-gray-800 px-1">지원 관리 목록</h2>
-                <div id="univ-list" class="space-y-4">
+                <div id="univ-list" class="space-y-2.5">
                     <!-- 자바스크립트로 동적 생성됨 -->
                 </div>
             </div>
@@ -54,7 +70,7 @@
 
     <!-- 대학/학과 추가 및 수정 모달 -->
     <div id="univ-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-3xl max-w-2xl w-full p-8 shadow-xl max-h-[90vh] overflow-y-auto space-y-6">
+        <div class="bg-white rounded-3xl max-w-3xl w-full p-8 shadow-xl max-h-[90vh] overflow-y-auto space-y-6">
             <div class="flex justify-between items-center border-b pb-4">
                 <h3 id="modal-title" class="text-xl font-bold text-gray-900">새 지원 대학 등록</h3>
                 <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
@@ -78,36 +94,60 @@
                     </div>
                 </div>
 
-                <!-- 3개년 (2024~2026) 데이터 -->
+                <!-- 연도별 입시 결과 입력 및 컷 기준 선택 -->
                 <div>
-                    <h4 class="text-sm font-bold text-gray-700 mb-3">3개년 입시 결과 및 경쟁률</h4>
-                    <div class="grid grid-cols-4 gap-2 text-center text-xs font-semibold text-gray-500 mb-2">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="text-sm font-bold text-gray-700">입시 결과 및 모집인원 입력</h4>
+                        <div class="flex items-center gap-3 text-xs text-gray-600 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200">
+                            <span class="font-semibold text-gray-700">최저 기준 선택:</span>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" id="chk-50" class="accent-indigo-600"> 50%</label>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" id="chk-70" class="accent-indigo-600"> 70%</label>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" id="chk-90" class="accent-indigo-600"> 90%</label>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" id="chk-100" class="accent-indigo-600"> 100%</label>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-6 gap-2 text-center text-xs font-semibold text-gray-500 mb-2">
                         <div>연도</div>
                         <div>모집인원</div>
                         <div>최종 경쟁률</div>
-                        <div>입결 등급</div>
+                        <div>추합인원</div>
+                        <div>평균등급</div>
+                        <div>최저</div>
                     </div>
                     <div class="space-y-2">
-                        <!-- 2024 -->
-                        <div class="grid grid-cols-4 gap-2 items-center">
-                            <span class="text-sm font-medium text-gray-600 text-center">2024</span>
-                            <input type="number" id="q-2024" placeholder="모집" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
-                            <input type="number" step="0.01" id="r-2024" placeholder="경쟁률" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
-                            <input type="number" step="0.01" id="g-2024" placeholder="등급" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
-                        </div>
-                        <!-- 2025 -->
-                        <div class="grid grid-cols-4 gap-2 items-center">
-                            <span class="text-sm font-medium text-gray-600 text-center">2025</span>
-                            <input type="number" id="q-2025" placeholder="모집" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
-                            <input type="number" step="0.01" id="r-2025" placeholder="경쟁률" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
-                            <input type="number" step="0.01" id="g-2025" placeholder="등급" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                        <!-- 2027 (맨 위) -->
+                        <div class="grid grid-cols-6 gap-2 items-center bg-indigo-50/50 p-1.5 rounded-xl border border-indigo-100">
+                            <span class="text-sm font-bold text-indigo-600 text-center">2027</span>
+                            <input type="number" id="q-2027" placeholder="모집정원" class="border border-gray-200 rounded-lg p-2 text-sm text-center bg-white">
+                            <span class="text-xs text-gray-400 text-center col-span-4">실시간 경쟁률은 아래에서 입력 / 2027 입결은 추후 입력</span>
                         </div>
                         <!-- 2026 -->
-                        <div class="grid grid-cols-4 gap-2 items-center">
+                        <div class="grid grid-cols-6 gap-2 items-center">
                             <span class="text-sm font-medium text-gray-600 text-center">2026</span>
                             <input type="number" id="q-2026" placeholder="모집" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
                             <input type="number" step="0.01" id="r-2026" placeholder="경쟁률" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
-                            <input type="number" step="0.01" id="g-2026" placeholder="등급" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                            <input type="number" id="extra-2026" placeholder="추합" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                            <input type="number" step="0.01" id="avg-2026" placeholder="평균" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                            <input type="text" id="min-2026" placeholder="최저" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                        </div>
+                        <!-- 2025 -->
+                        <div class="grid grid-cols-6 gap-2 items-center">
+                            <span class="text-sm font-medium text-gray-600 text-center">2025</span>
+                            <input type="number" id="q-2025" placeholder="모집" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                            <input type="number" step="0.01" id="r-2025" placeholder="경쟁률" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                            <input type="number" id="extra-2025" placeholder="추합" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                            <input type="number" step="0.01" id="avg-2025" placeholder="평균" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                            <input type="text" id="min-2025" placeholder="최저" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                        </div>
+                        <!-- 2024 -->
+                        <div class="grid grid-cols-6 gap-2 items-center">
+                            <span class="text-sm font-medium text-gray-600 text-center">2024</span>
+                            <input type="number" id="q-2024" placeholder="모집" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                            <input type="number" step="0.01" id="r-2024" placeholder="경쟁률" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                            <input type="number" id="extra-2024" placeholder="추합" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                            <input type="number" step="0.01" id="avg-2024" placeholder="평균" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
+                            <input type="text" id="min-2024" placeholder="최저" class="border border-gray-200 rounded-lg p-2 text-sm text-center">
                         </div>
                     </div>
                 </div>
@@ -130,17 +170,54 @@
                 type: '학생부교과',
                 major: '컴퓨터공학과',
                 history: {
-                    2024: { quota: 15, rate: 14.2, grade: 2.1 },
-                    2025: { quota: 15, rate: 16.8, grade: 1.9 },
-                    2026: { quota: 18, rate: 21.4, grade: 2.0 }
+                    2024: { quota: 15, rate: 14.2, extra: 12, avg: 2.2, min: '3합6' },
+                    2025: { quota: 15, rate: 16.8, extra: 15, avg: 2.0, min: '3합6' },
+                    2026: { quota: 18, rate: 21.4, extra: 10, avg: 1.9, min: '3합5' },
+                    2027: { quota: 20 }
                 },
-                // 2027 시간대별 경쟁률 (9/7 09:00 ~ 9/11 18:00, 3시간 간격 기본 슬롯)
+                cutStandards: { '50': false, '70': true, '90': false, '100': false },
                 rates2027: generateDefaultTimeslots()
             }
         ];
 
         let selectedId = universities.length > 0 ? universities[0].id : null;
         let chartInstance = null;
+
+        function exportDataFile() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(universities, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "univ_backup.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function importDataFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (Array.isArray(importedData)) {
+                        universities = importedData;
+                        saveToStorage();
+                        selectedId = universities.length > 0 ? universities[0].id : null;
+                        renderList();
+                        renderDetail();
+                        alert("데이터를 성공적으로 불러왔습니다!");
+                    } else {
+                        alert("올바른 데이터 파일이 아닙니다.");
+                    }
+                } catch (error) {
+                    alert("파일을 읽는 중 오류가 발생했습니다.");
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
 
         function generateDefaultTimeslots() {
             const slots = [];
@@ -169,18 +246,20 @@
                 return;
             }
 
-            listEl.innerHTML = universities.map(u => `
-                <div onclick="selectUniv(${u.id})" class="bg-white p-5 rounded-2xl border ${u.id === selectedId ? 'border-indigo-600 ring-2 ring-indigo-50/50' : 'border-gray-100 hover:border-gray-200'} cursor-pointer transition shadow-sm space-y-2">
-                    <div class="flex justify-between items-start">
-                        <span class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full">${u.type}</span>
+            const sortedUnivs = [...universities].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+
+            listEl.innerHTML = sortedUnivs.map(u => `
+                <div onclick="selectUniv(${u.id})" class="bg-white py-3 px-4 rounded-xl border ${u.id === selectedId ? 'border-indigo-600 ring-2 ring-indigo-50/50' : 'border-gray-100 hover:border-gray-200'} cursor-pointer transition shadow-sm flex flex-col gap-1.5">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">${u.type}</span>
                         <div class="flex gap-2">
-                            <button onclick="event.stopPropagation(); editUniv(${u.id})" class="text-gray-400 hover:text-gray-600 text-xs">수정</button>
-                            <button onclick="event.stopPropagation(); deleteUniv(${u.id})" class="text-red-400 hover:text-red-600 text-xs">삭제</button>
+                            <button onclick="event.stopPropagation(); editUniv(${u.id})" class="text-gray-400 hover:text-gray-600 text-[11px]">수정</button>
+                            <button onclick="event.stopPropagation(); deleteUniv(${u.id})" class="text-red-400 hover:text-red-600 text-[11px]">삭제</button>
                         </div>
                     </div>
-                    <div>
-                        <h3 class="font-bold text-gray-900 text-lg">${u.name}</h3>
-                        <p class="text-sm text-gray-500">${u.major}</p>
+                    <div class="flex items-baseline gap-1.5 overflow-hidden">
+                        <h3 class="font-bold text-gray-900 text-[15px] whitespace-nowrap">${u.name}</h3>
+                        <p class="text-[13px] text-gray-500 truncate">${u.major}</p>
                     </div>
                 </div>
             `).join('');
@@ -196,6 +275,53 @@
                 return;
             }
 
+            if (!u.history[2027]) u.history[2027] = { quota: '' };
+            const cut = u.cutStandards || { '50': false, '70': false, '90': false, '100': false };
+
+            const checkedCuts = ['50', '70', '90', '100']
+                .filter(p => cut[p])
+                .map(p => p + '%')
+                .join(', ');
+            const minHeaderText = checkedCuts ? `최저 (${checkedCuts})` : '최저';
+
+            // [추가] 시간대별 데이터 시간순(문자열 기준) 정렬 (차트와 목록에 모두 올바르게 반영됨)
+            u.rates2027.sort((a, b) => a.time.localeCompare(b.time));
+
+            // [추가] 정렬된 데이터를 날짜별로 그룹화
+            const groupedSlots = {};
+            u.rates2027.forEach((slot, index) => {
+                const parts = slot.time.trim().split(' ');
+                let dateKey = '미분류';
+                let timeDisplay = slot.time;
+                if(parts.length >= 2) {
+                    dateKey = parts[0];
+                    timeDisplay = parts.slice(1).join(' '); // 시간 부분만 추출 (예: 09:00)
+                }
+                if (!groupedSlots[dateKey]) groupedSlots[dateKey] = [];
+                groupedSlots[dateKey].push({ rate: slot.rate, originalIndex: index, timeDisplay: timeDisplay });
+            });
+
+            // [추가] 날짜별 열(Column) HTML 생성
+            const groupedHtml = Object.keys(groupedSlots).map(date => `
+                <div class="min-w-[150px] bg-gray-50/50 border border-gray-200 rounded-xl p-3 flex flex-col gap-2">
+                    <div class="text-center text-sm font-bold text-gray-700 border-b border-gray-200 pb-2">${date}</div>
+                    <div class="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                        ${groupedSlots[date].map(item => `
+                            <div class="bg-white border border-gray-200 p-2.5 rounded-lg flex flex-col gap-1.5 shadow-sm">
+                                <div class="flex justify-between items-center text-xs text-indigo-600 font-semibold">
+                                    <span>${item.timeDisplay}</span>
+                                    <button onclick="removeSlot(${item.originalIndex})" class="text-gray-300 hover:text-red-500 transition">&times;</button>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <input type="number" step="0.01" value="${item.rate}" onchange="updateRate2027(${item.originalIndex}, this.value)" placeholder="경쟁률 입력" class="w-full bg-gray-50 border border-gray-200 rounded-md px-2 py-1.5 text-sm text-center focus:outline-none focus:bg-white focus:ring-1 focus:ring-indigo-500">
+                                    <span class="text-xs text-gray-400">:1</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+
             detailEl.innerHTML = `
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-6 gap-4">
                     <div>
@@ -204,9 +330,8 @@
                     </div>
                 </div>
 
-                <!-- 3개년 결과 요약 테이블 -->
                 <div>
-                    <h3 class="text-sm font-bold text-gray-700 mb-3">3개년 입시 결과 요약</h3>
+                    <h3 class="text-sm font-bold text-gray-700 mb-3">연도별 입시 결과 및 모집인원 요약</h3>
                     <div class="overflow-x-auto">
                         <table class="w-full text-center text-sm border-collapse">
                             <thead>
@@ -214,16 +339,25 @@
                                     <th class="p-3 rounded-l-xl">연도</th>
                                     <th class="p-3">모집인원</th>
                                     <th class="p-3">최종 경쟁률</th>
-                                    <th class="p-3 rounded-r-xl">입결 등급</th>
+                                    <th class="p-3">추합인원</th>
+                                    <th class="p-3">평균등급</th>
+                                    <th class="p-3 rounded-r-xl">${minHeaderText}</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
-                                ${[2024, 2025, 2026].map(yr => `
+                                <tr class="bg-indigo-50/30 font-bold text-indigo-600">
+                                    <td class="p-3">2027학년도</td>
+                                    <td class="p-3">${u.history[2027].quota ? u.history[2027].quota + '명' : '-'}</td>
+                                    <td class="p-3 text-gray-400" colspan="4">실시간 경쟁률 집계 중</td>
+                                </tr>
+                                ${[2026, 2025, 2024].map(yr => `
                                     <tr>
                                         <td class="p-3 font-medium text-gray-700">${yr}학년도</td>
-                                        <td class="p-3 text-gray-600">${u.history[yr].quota ? u.history[yr].quota + '명' : '-'}</td>
-                                        <td class="p-3 font-semibold text-indigo-600">${u.history[yr].rate ? u.history[yr].rate + ':1' : '-'}</td>
-                                        <td class="p-3 text-gray-600">${u.history[yr].grade ? u.history[yr].grade + '등급' : '-'}</td>
+                                        <td class="p-3 text-gray-600">${u.history[yr]?.quota ? u.history[yr].quota + '명' : '-'}</td>
+                                        <td class="p-3 font-semibold text-indigo-600">${u.history[yr]?.rate ? u.history[yr].rate + ':1' : '-'}</td>
+                                        <td class="p-3 text-gray-600">${u.history[yr]?.extra !== undefined && u.history[yr]?.extra !== '' ? u.history[yr].extra + '명' : '-'}</td>
+                                        <td class="p-3 text-gray-600">${u.history[yr]?.avg ? u.history[yr].avg + '등급' : '-'}</td>
+                                        <td class="p-3 text-gray-600">${u.history[yr]?.min || '-'}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -231,36 +365,24 @@
                     </div>
                 </div>
 
-                <!-- 그래프 영역 -->
                 <div class="space-y-3 pt-4 border-t">
                     <div class="flex justify-between items-center">
                         <h3 class="text-sm font-bold text-gray-700">2027 시간대별 경쟁률 추이 및 3개년 비교</h3>
                         <span class="text-xs text-gray-400">접수기간: 9/7 ~ 9/11</span>
                     </div>
-                    <div class="bg-gray-50/50 p-4 rounded-2xl border border-gray-100 relative h-80">
+                    <div class="bg-gray-50/50 p-4 pr-12 rounded-2xl border border-gray-100 relative h-80">
                         <canvas id="rateChart"></canvas>
                     </div>
                 </div>
 
-                <!-- 2027 시간대별 경쟁률 직접 입력 (3시간 간격) -->
                 <div class="space-y-4 pt-4 border-t">
                     <div class="flex justify-between items-center">
-                        <h3 class="text-sm font-bold text-gray-700">2027 시간대별 경쟁률 입력 (3시간 간격)</h3>
+                        <h3 class="text-sm font-bold text-gray-700">2027 시간대별 경쟁률 입력</h3>
                         <button onclick="addCustomSlot()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg font-medium transition">+ 시간대 추가</button>
                     </div>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-60 overflow-y-auto p-1">
-                        ${u.rates2027.map((slot, index) => `
-                            <div class="bg-gray-50 border border-gray-200 p-3 rounded-xl flex flex-col gap-1">
-                                <div class="flex justify-between items-center text-xs text-gray-500 font-medium">
-                                    <span>${slot.time}</span>
-                                    <button onclick="removeSlot(${index})" class="text-red-400 hover:text-red-600">&times;</button>
-                                </div>
-                                <div class="flex items-center gap-1">
-                                    <input type="number" step="0.01" value="${slot.rate}" onchange="updateRate2027(${index}, this.value)" placeholder="경쟁률 입력" class="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm text-center focus:outline-none focus:ring-1 focus:ring-indigo-500">
-                                    <span class="text-xs text-gray-400">:1</span>
-                                </div>
-                            </div>
-                        `).join('')}
+                    <!-- 일자별 세로 나열 레이아웃 적용 -->
+                    <div class="flex overflow-x-auto gap-4 pb-4 pt-1 px-1">
+                        ${groupedHtml}
                     </div>
                 </div>
             `;
@@ -275,10 +397,39 @@
             const labels = u.rates2027.map(s => s.time);
             const data2027 = u.rates2027.map(s => s.rate ? parseFloat(s.rate) : null);
 
-            // 3개년 최종 경쟁률 데이터 (2024, 2025, 2026 각각 고유하고 진한 색상 적용)
-            const final2024 = u.history[2024].rate || 0;
-            const final2025 = u.history[2025].rate || 0;
-            const final2026 = u.history[2026].rate || 0;
+            const final2024 = u.history[2024]?.rate || 0;
+            const final2025 = u.history[2025]?.rate || 0;
+            const final2026 = u.history[2026]?.rate || 0;
+
+            const rightLabelPlugin = {
+                id: 'rightLabelPlugin',
+                afterDraw(chart) {
+                    const { ctx, chartArea, scales } = chart;
+                    const yScale = scales.y;
+                    const rightX = chartArea.right + 8;
+
+                    const lines = [
+                        { val: final2026, text: '2026 (' + final2026 + ':1)', color: '#ef4444' },
+                        { val: final2025, text: '2025 (' + final2025 + ':1)', color: '#f59e0b' },
+                        { val: final2024, text: '2024 (' + final2024 + ':1)', color: '#10b981' }
+                    ];
+
+                    ctx.save();
+                    ctx.font = 'bold 11px sans-serif';
+                    ctx.textBaseline = 'middle';
+
+                    lines.forEach(item => {
+                        if (item.val > 0) {
+                            const yCoord = yScale.getPixelForValue(item.val);
+                            if (yCoord >= chartArea.top && yCoord <= chartArea.bottom) {
+                                ctx.fillStyle = item.color;
+                                ctx.fillText(item.text, rightX, yCoord);
+                            }
+                        }
+                    });
+                    ctx.restore();
+                }
+            };
 
             chartInstance = new Chart(ctx, {
                 type: 'line',
@@ -288,32 +439,32 @@
                         {
                             label: '2027 현재 경쟁률',
                             data: data2027,
-                            borderColor: '#4f46e5', // 진한 인디고 (메인)
+                            borderColor: '#4f46e5',
                             backgroundColor: '#4f46e5',
                             borderWidth: 3.5,
                             tension: 0.2,
                             spanGaps: true,
                         },
                         {
-                            label: '2026 최종 (' + final2026 + ':1)',
+                            label: '2026 최종',
                             data: Array(labels.length).fill(final2026),
-                            borderColor: '#ef4444', // 진한 레드
+                            borderColor: '#ef4444',
                             borderDash: [6, 6],
                             borderWidth: 2,
                             pointRadius: 0,
                         },
                         {
-                            label: '2025 최종 (' + final2025 + ':1)',
+                            label: '2025 최종',
                             data: Array(labels.length).fill(final2025),
-                            borderColor: '#f59e0b', // 진한 앰버(오렌지)
+                            borderColor: '#f59e0b',
                             borderDash: [6, 6],
                             borderWidth: 2,
                             pointRadius: 0,
                         },
                         {
-                            label: '2024 최종 (' + final2024 + ':1)',
+                            label: '2024 최종',
                             data: Array(labels.length).fill(final2024),
-                            borderColor: '#10b981', // 진한 에메랄드(초록)
+                            borderColor: '#10b981',
                             borderDash: [6, 6],
                             borderWidth: 2,
                             pointRadius: 0,
@@ -323,22 +474,18 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    layout: {
+                        padding: { right: 70 }
+                    },
                     scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: { color: '#f3f4f6' }
-                        },
-                        x: {
-                            grid: { display: false }
-                        }
+                        y: { beginAtZero: true, grid: { color: '#f3f4f6' } },
+                        x: { grid: { display: false } }
                     },
                     plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: { font: { size: 12 }, boxWidth: 16 }
-                        }
+                        legend: { position: 'bottom', labels: { font: { size: 12 }, boxWidth: 16 } }
                     }
-                }
+                },
+                plugins: [rightLabelPlugin]
             });
         }
 
@@ -355,6 +502,9 @@
                 document.getElementById('modal-title').innerText = '새 지원 대학 등록';
                 document.getElementById('univ-form').reset();
                 document.getElementById('edit-id').value = '';
+                ['50', '70', '90', '100'].forEach(p => {
+                    document.getElementById(`chk-${p}`).checked = (p === '70');
+                });
             }
         }
 
@@ -370,10 +520,36 @@
             const type = document.getElementById('univ-type').value;
             const major = document.getElementById('univ-major').value;
 
+            const cutStandards = {
+                '50': document.getElementById('chk-50').checked,
+                '70': document.getElementById('chk-70').checked,
+                '90': document.getElementById('chk-90').checked,
+                '100': document.getElementById('chk-100').checked
+            };
+
             const history = {
-                2024: { quota: document.getElementById('q-2024').value, rate: document.getElementById('r-2024').value, grade: document.getElementById('g-2024').value },
-                2025: { quota: document.getElementById('q-2025').value, rate: document.getElementById('r-2025').value, grade: document.getElementById('g-2025').value },
-                2026: { quota: document.getElementById('q-2026').value, rate: document.getElementById('r-2026').value, grade: document.getElementById('g-2026').value },
+                2027: { quota: document.getElementById('q-2027').value },
+                2026: { 
+                    quota: document.getElementById('q-2026').value, 
+                    rate: document.getElementById('r-2026').value, 
+                    extra: document.getElementById('extra-2026').value,
+                    avg: document.getElementById('avg-2026').value,
+                    min: document.getElementById('min-2026').value
+                },
+                2025: { 
+                    quota: document.getElementById('q-2025').value, 
+                    rate: document.getElementById('r-2025').value, 
+                    extra: document.getElementById('extra-2025').value,
+                    avg: document.getElementById('avg-2025').value,
+                    min: document.getElementById('min-2025').value
+                },
+                2024: { 
+                    quota: document.getElementById('q-2024').value, 
+                    rate: document.getElementById('r-2024').value, 
+                    extra: document.getElementById('extra-2024').value,
+                    avg: document.getElementById('avg-2024').value,
+                    min: document.getElementById('min-2024').value
+                }
             };
 
             if (editId) {
@@ -381,11 +557,13 @@
                 u.name = name;
                 u.type = type;
                 u.major = major;
+                u.cutStandards = cutStandards;
                 u.history = history;
             } else {
                 const newUniv = {
                     id: Date.now(),
                     name, type, major, history,
+                    cutStandards,
                     rates2027: generateDefaultTimeslots()
                 };
                 universities.push(newUniv);
@@ -408,10 +586,18 @@
             document.getElementById('univ-type').value = u.type;
             document.getElementById('univ-major').value = u.major;
 
-            [2024, 2025, 2026].forEach(yr => {
-                document.getElementById(`q-${yr}`).value = u.history[yr].quota || '';
-                document.getElementById(`r-${yr}`).value = u.history[yr].rate || '';
-                document.getElementById(`g-${yr}`).value = u.history[yr].grade || '';
+            const cut = u.cutStandards || { '50': false, '70': false, '90': false, '100': false };
+            ['50', '70', '90', '100'].forEach(p => {
+                document.getElementById(`chk-${p}`).checked = !!cut[p];
+            });
+
+            document.getElementById('q-2027').value = u.history[2027]?.quota || '';
+            [2026, 2025, 2024].forEach(yr => {
+                document.getElementById(`q-${yr}`).value = u.history[yr]?.quota || '';
+                document.getElementById(`r-${yr}`).value = u.history[yr]?.rate || '';
+                document.getElementById(`extra-${yr}`).value = u.history[yr]?.extra || '';
+                document.getElementById(`avg-${yr}`).value = u.history[yr]?.avg || '';
+                document.getElementById(`min-${yr}`).value = u.history[yr]?.min || '';
             });
 
             openModal(true);
@@ -445,7 +631,7 @@
                 if(timeInput) {
                     u.rates2027.push({ time: timeInput, rate: '' });
                     saveToStorage();
-                    renderDetail();
+                    renderDetail(); // 렌더링 시 자동 시간순 정렬됨
                 }
             }
         }
