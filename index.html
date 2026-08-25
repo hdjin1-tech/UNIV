@@ -83,6 +83,13 @@
 
             <form id="univ-form" onsubmit="handleFormSubmit(event)" class="space-y-6">
                 <input type="hidden" id="edit-id">
+                <!-- 상향/적정/안정 체크박스 영역 -->
+                <div class="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                    <span class="text-xs font-semibold text-gray-700">지원 전략 구분:</span>
+                    <label class="flex items-center gap-1.5 cursor-pointer text-sm font-medium"><input type="checkbox" id="tag-high" class="accent-red-600 w-4 h-4"> 상향</label>
+                    <label class="flex items-center gap-1.5 cursor-pointer text-sm font-medium"><input type="checkbox" id="tag-fit" class="accent-indigo-600 w-4 h-4"> 적정</label>
+                    <label class="flex items-center gap-1.5 cursor-pointer text-sm font-medium"><input type="checkbox" id="tag-safe" class="accent-emerald-600 w-4 h-4"> 안정</label>
+                </div>
                 <!-- 기본 정보 -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
