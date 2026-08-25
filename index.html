@@ -9,7 +9,7 @@
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
-    <!-- ★ Firebase 연동을 위한 라이브러리 추가 ★ -->
+    <!-- Firebase 연동을 위한 라이브러리 추가 -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
@@ -83,6 +83,7 @@
 
             <form id="univ-form" onsubmit="handleFormSubmit(event)" class="space-y-6">
                 <input type="hidden" id="edit-id">
+                
                 <!-- 상향/적정/안정 체크박스 영역 -->
                 <div class="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <span class="text-xs font-semibold text-gray-700">지원 전략 구분:</span>
@@ -90,6 +91,7 @@
                     <label class="flex items-center gap-1.5 cursor-pointer text-sm font-medium"><input type="checkbox" id="tag-fit" class="accent-indigo-600 w-4 h-4"> 적정</label>
                     <label class="flex items-center gap-1.5 cursor-pointer text-sm font-medium"><input type="checkbox" id="tag-safe" class="accent-emerald-600 w-4 h-4"> 안정</label>
                 </div>
+
                 <!-- 기본 정보 -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
@@ -174,7 +176,6 @@
 
     <!-- 자바스크립트 로직 -->
     <script>
-        // ★ 화면에서 뽑아온 고객님의 Firebase 프로젝트 설정 정보
         const firebaseConfig = {
             apiKey: "AIzaSyBdxzJL0EtEiLUo-7Jy_TEjKI-34vfJ7RU",
             authDomain: "univ-6457b.firebaseapp.com",
@@ -185,7 +186,6 @@
             appId: "1:401584012360:web:09cad66dab872cc5b12c7d"
         };
 
-        // Firebase 초기화
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
@@ -194,19 +194,18 @@
         let chartInstance = null;
         let isFirstLoad = true;
 
-        // ★ Firebase 실시간 데이터 동기화 (누가 고치든 즉시 반영됨)
         db.ref('univ_data').on('value', (snapshot) => {
             const data = snapshot.val();
             
             if (data) {
                 universities = data;
             } else {
-                // 데이터베이스가 처음 만들어져서 텅 비어있을 때 기본 데이터 세팅
                 universities = [{
                     id: 1,
                     name: '한국대',
                     type: '학생부교과',
                     major: '컴퓨터공학과',
+                    tags: { high: true, fit: false, safe: false },
                     history: {
                         2024: { quota: 15, rate: 14.2, extra: 12, avg: 2.2, min: '3합6' },
                         2025: { quota: 15, rate: 16.8, extra: 15, avg: 2.0, min: '3합6' },
@@ -230,7 +229,6 @@
             renderDetail();
         });
 
-        // ★ 서버(Firebase)에 데이터 저장하는 함수
         function saveToStorage() {
             db.ref('univ_data').set(universities);
         }
@@ -293,21 +291,30 @@
 
             const sortedUnivs = [...universities].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 
-            listEl.innerHTML = sortedUnivs.map(u => `
-                <div onclick="selectUniv(${u.id})" class="bg-white py-3 px-4 rounded-xl border ${u.id === selectedId ? 'border-indigo-600 ring-2 ring-indigo-50/50' : 'border-gray-100 hover:border-gray-200'} cursor-pointer transition shadow-sm flex flex-col gap-1.5">
-                    <div class="flex justify-between items-center">
-                        <span class="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">${u.type}</span>
-                        <div class="flex gap-2">
-                            <button onclick="event.stopPropagation(); editUniv(${u.id})" class="text-gray-400 hover:text-gray-600 text-[11px]">수정</button>
-                            <button onclick="event.stopPropagation(); deleteUniv(${u.id})" class="text-red-400 hover:text-red-600 text-[11px]">삭제</button>
+            listEl.innerHTML = sortedUnivs.map(u => {
+                const tagObj = u.tags || { high: false, fit: false, safe: false };
+                let tagText = '';
+                if (tagObj.high) tagText += '[상향] ';
+                if (tagObj.fit) tagText += '[적정] ';
+                if (tagObj.safe) tagText += '[안정] ';
+
+                return `
+                    <div onclick="selectUniv(${u.id})" class="bg-white py-3 px-4 rounded-xl border ${u.id === selectedId ? 'border-indigo-600 ring-2 ring-indigo-50/50' : 'border-gray-100 hover:border-gray-200'} cursor-pointer transition shadow-sm flex flex-col gap-1.5">
+                        <div class="flex justify-between items-center">
+                            <span class="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">${u.type}</span>
+                            <div class="flex gap-2">
+                                <button onclick="event.stopPropagation(); editUniv(${u.id})" class="text-gray-400 hover:text-gray-600 text-[11px]">수정</button>
+                                <button onclick="event.stopPropagation(); deleteUniv(${u.id})" class="text-red-400 hover:text-red-600 text-[11px]">삭제</button>
+                            </div>
+                        </div>
+                        <div class="flex items-baseline gap-1 overflow-hidden">
+                            ${tagText ? `<span class="text-red-600 font-bold text-[15px] whitespace-nowrap">${tagText}</span>` : ''}
+                            <h3 class="font-bold text-gray-900 text-[15px] whitespace-nowrap">${u.name}</h3>
+                            <p class="text-[13px] text-gray-500 truncate">${u.major}</p>
                         </div>
                     </div>
-                    <div class="flex items-baseline gap-1.5 overflow-hidden">
-                        <h3 class="font-bold text-gray-900 text-[15px] whitespace-nowrap">${u.name}</h3>
-                        <p class="text-[13px] text-gray-500 truncate">${u.major}</p>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         function renderDetail() {
@@ -365,11 +372,20 @@
                 </div>
             `).join('');
 
+            const tagObj = u.tags || { high: false, fit: false, safe: false };
+            let tagText = '';
+            if (tagObj.high) tagText += '[상향] ';
+            if (tagObj.fit) tagText += '[적정] ';
+            if (tagObj.safe) tagText += '[안정] ';
+
             detailEl.innerHTML = `
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-6 gap-4">
                     <div>
                         <span class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">${u.type}</span>
-                        <h2 class="text-2xl font-bold text-gray-900 mt-2">${u.name} - ${u.major}</h2>
+                        <div class="flex items-center gap-1.5 mt-2">
+                            ${tagText ? `<span class="text-red-600 font-bold text-2xl">${tagText}</span>` : ''}
+                            <h2 class="text-2xl font-bold text-gray-900">${u.name} - ${u.major}</h2>
+                        </div>
                     </div>
                 </div>
 
@@ -544,6 +560,11 @@
                 document.getElementById('modal-title').innerText = '새 지원 대학 등록';
                 document.getElementById('univ-form').reset();
                 document.getElementById('edit-id').value = '';
+                
+                document.getElementById('tag-high').checked = false;
+                document.getElementById('tag-fit').checked = true;
+                document.getElementById('tag-safe').checked = false;
+
                 ['50', '70', '90', '100'].forEach(p => {
                     document.getElementById(`chk-${p}`).checked = (p === '70');
                 });
@@ -555,14 +576,13 @@
             document.getElementById('univ-modal').classList.add('hidden');
         }
 
-       function handleFormSubmit(event) {
+        function handleFormSubmit(event) {
             event.preventDefault();
             const editId = document.getElementById('edit-id').value;
             const name = document.getElementById('univ-name').value;
             const type = document.getElementById('univ-type').value;
             const major = document.getElementById('univ-major').value;
 
-            // [추가된 부분] 체크박스 값 가져오기
             const tags = {
                 high: document.getElementById('tag-high').checked,
                 fit: document.getElementById('tag-fit').checked,
@@ -606,13 +626,13 @@
                 u.name = name;
                 u.type = type;
                 u.major = major;
-                u.tags = tags; // [추가된 부분]
+                u.tags = tags;
                 u.cutStandards = cutStandards;
                 u.history = history;
             } else {
                 const newUniv = {
                     id: Date.now(),
-                    name, type, major, tags, history, // [추가된 부분]
+                    name, type, major, tags, history,
                     cutStandards,
                     rates2027: generateDefaultTimeslots()
                 };
@@ -625,6 +645,7 @@
             renderDetail();
             closeModal();
         }
+
         function editUniv(id) {
             const u = universities.find(item => item.id === id);
             if(!u) return;
@@ -634,6 +655,11 @@
             document.getElementById('univ-name').value = u.name;
             document.getElementById('univ-type').value = u.type;
             document.getElementById('univ-major').value = u.major;
+
+            const tags = u.tags || { high: false, fit: false, safe: false };
+            document.getElementById('tag-high').checked = !!tags.high;
+            document.getElementById('tag-fit').checked = !!tags.fit;
+            document.getElementById('tag-safe').checked = !!tags.safe;
 
             const cut = u.cutStandards || { '50': false, '70': false, '90': false, '100': false };
             ['50', '70', '90', '100'].forEach(p => {
@@ -655,6 +681,9 @@
         function deleteUniv(id) {
             if(confirm('정말 삭제하시겠습니까?')) {
                 universities = universities.filter(item => item.id !== id);
+                if(selectedId === id) {
+                    selectedId = universities.length > 0 ? universities[0].id : null;
+                }
                 saveToStorage();
             }
         }
