@@ -8,6 +8,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- ★ Firebase 연동을 위한 라이브러리 추가 ★ -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
     <style>
         body { background-color: #FAFAFA; }
         /* 스크롤바 디자인 (일자별 세로 스크롤용) */
@@ -162,26 +167,65 @@
 
     <!-- 자바스크립트 로직 -->
     <script>
-        // 기본 예시 데이터
-        let universities = JSON.parse(localStorage.getItem('univ_data')) || [
-            {
-                id: 1,
-                name: '한국대',
-                type: '학생부교과',
-                major: '컴퓨터공학과',
-                history: {
-                    2024: { quota: 15, rate: 14.2, extra: 12, avg: 2.2, min: '3합6' },
-                    2025: { quota: 15, rate: 16.8, extra: 15, avg: 2.0, min: '3합6' },
-                    2026: { quota: 18, rate: 21.4, extra: 10, avg: 1.9, min: '3합5' },
-                    2027: { quota: 20 }
-                },
-                cutStandards: { '50': false, '70': true, '90': false, '100': false },
-                rates2027: generateDefaultTimeslots()
-            }
-        ];
+        // ★ 화면에서 뽑아온 고객님의 Firebase 프로젝트 설정 정보
+        const firebaseConfig = {
+            apiKey: "AIzaSyBdxzJL0EtEiLUo-7Jy_TEjKI-34vfJ7RU",
+            authDomain: "univ-6457b.firebaseapp.com",
+            projectId: "univ-6457b",
+            storageBucket: "univ-6457b.firebasestorage.app",
+            messagingSenderId: "401584012360",
+            appId: "1:401584012360:web:09cad66dab872cc5b12c7d"
+        };
 
-        let selectedId = universities.length > 0 ? universities[0].id : null;
+        // Firebase 초기화
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let universities = [];
+        let selectedId = null;
         let chartInstance = null;
+        let isFirstLoad = true;
+
+        // ★ Firebase 실시간 데이터 동기화 (누가 고치든 즉시 반영됨)
+        db.ref('univ_data').on('value', (snapshot) => {
+            const data = snapshot.val();
+            
+            if (data) {
+                universities = data;
+            } else {
+                // 데이터베이스가 처음 만들어져서 텅 비어있을 때 기본 데이터 세팅
+                universities = [{
+                    id: 1,
+                    name: '한국대',
+                    type: '학생부교과',
+                    major: '컴퓨터공학과',
+                    history: {
+                        2024: { quota: 15, rate: 14.2, extra: 12, avg: 2.2, min: '3합6' },
+                        2025: { quota: 15, rate: 16.8, extra: 15, avg: 2.0, min: '3합6' },
+                        2026: { quota: 18, rate: 21.4, extra: 10, avg: 1.9, min: '3합5' },
+                        2027: { quota: 20 }
+                    },
+                    cutStandards: { '50': false, '70': true, '90': false, '100': false },
+                    rates2027: generateDefaultTimeslots()
+                }];
+                saveToStorage();
+            }
+
+            if (isFirstLoad) {
+                selectedId = universities.length > 0 ? universities[0].id : null;
+                isFirstLoad = false;
+            } else if (selectedId && !universities.find(item => item.id === selectedId)) {
+                selectedId = universities.length > 0 ? universities[0].id : null;
+            }
+
+            renderList();
+            renderDetail();
+        });
+
+        // ★ 서버(Firebase)에 데이터 저장하는 함수
+        function saveToStorage() {
+            db.ref('univ_data').set(universities);
+        }
 
         function exportDataFile() {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(universities, null, 2));
@@ -204,10 +248,7 @@
                     if (Array.isArray(importedData)) {
                         universities = importedData;
                         saveToStorage();
-                        selectedId = universities.length > 0 ? universities[0].id : null;
-                        renderList();
-                        renderDetail();
-                        alert("데이터를 성공적으로 불러왔습니다!");
+                        alert("데이터를 성공적으로 서버에 불러왔습니다!");
                     } else {
                         alert("올바른 데이터 파일이 아닙니다.");
                     }
@@ -233,10 +274,6 @@
                 });
             });
             return slots;
-        }
-
-        function saveToStorage() {
-            localStorage.setItem('univ_data', JSON.stringify(universities));
         }
 
         function renderList() {
@@ -284,10 +321,9 @@
                 .join(', ');
             const minHeaderText = checkedCuts ? `최저 (${checkedCuts})` : '최저';
 
-            // [추가] 시간대별 데이터 시간순(문자열 기준) 정렬 (차트와 목록에 모두 올바르게 반영됨)
+            if (!u.rates2027) u.rates2027 = generateDefaultTimeslots();
             u.rates2027.sort((a, b) => a.time.localeCompare(b.time));
 
-            // [추가] 정렬된 데이터를 날짜별로 그룹화
             const groupedSlots = {};
             u.rates2027.forEach((slot, index) => {
                 const parts = slot.time.trim().split(' ');
@@ -295,13 +331,12 @@
                 let timeDisplay = slot.time;
                 if(parts.length >= 2) {
                     dateKey = parts[0];
-                    timeDisplay = parts.slice(1).join(' '); // 시간 부분만 추출 (예: 09:00)
+                    timeDisplay = parts.slice(1).join(' '); 
                 }
                 if (!groupedSlots[dateKey]) groupedSlots[dateKey] = [];
                 groupedSlots[dateKey].push({ rate: slot.rate, originalIndex: index, timeDisplay: timeDisplay });
             });
 
-            // [추가] 날짜별 열(Column) HTML 생성
             const groupedHtml = Object.keys(groupedSlots).map(date => `
                 <div class="min-w-[150px] bg-gray-50/50 border border-gray-200 rounded-xl p-3 flex flex-col gap-2">
                     <div class="text-center text-sm font-bold text-gray-700 border-b border-gray-200 pb-2">${date}</div>
@@ -380,7 +415,6 @@
                         <h3 class="text-sm font-bold text-gray-700">2027 시간대별 경쟁률 입력</h3>
                         <button onclick="addCustomSlot()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg font-medium transition">+ 시간대 추가</button>
                     </div>
-                    <!-- 일자별 세로 나열 레이아웃 적용 -->
                     <div class="flex overflow-x-auto gap-4 pb-4 pt-1 px-1">
                         ${groupedHtml}
                     </div>
@@ -571,8 +605,6 @@
             }
 
             saveToStorage();
-            renderList();
-            renderDetail();
             closeModal();
         }
 
@@ -606,12 +638,7 @@
         function deleteUniv(id) {
             if(confirm('정말 삭제하시겠습니까?')) {
                 universities = universities.filter(item => item.id !== id);
-                if(selectedId === id) {
-                    selectedId = universities.length > 0 ? universities[0].id : null;
-                }
                 saveToStorage();
-                renderList();
-                renderDetail();
             }
         }
 
@@ -620,7 +647,6 @@
             if(u) {
                 u.rates2027[index].rate = value;
                 saveToStorage();
-                renderChart(u);
             }
         }
 
@@ -631,7 +657,6 @@
                 if(timeInput) {
                     u.rates2027.push({ time: timeInput, rate: '' });
                     saveToStorage();
-                    renderDetail(); // 렌더링 시 자동 시간순 정렬됨
                 }
             }
         }
@@ -641,13 +666,8 @@
             if(u) {
                 u.rates2027.splice(index, 1);
                 saveToStorage();
-                renderDetail();
             }
         }
-
-        // 초기 렌더링 실행
-        renderList();
-        renderDetail();
     </script>
 </body>
 </html>
