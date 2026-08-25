@@ -15,7 +15,6 @@
 
     <style>
         body { background-color: #FAFAFA; }
-        /* 스크롤바 디자인 */
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 4px; }
@@ -199,8 +198,18 @@
             const data = snapshot.val();
             
             if (data) {
-                universities = data;
+                // ★ 핵심 수정 부분: 파이어베이스에서 데이터를 불러올 때 기존의 텅 빈 3시간 간격 슬롯들을 싹 지워버립니다.
+                universities = data.map(u => {
+                    if (u.rates2027) {
+                        // rate 값이 비어있는('' 또는 null) 박스들은 모두 걸러냅니다.
+                        u.rates2027 = u.rates2027.filter(slot => slot.rate !== '' && slot.rate !== null && slot.rate !== undefined);
+                    } else {
+                        u.rates2027 = [];
+                    }
+                    return u;
+                });
             } else {
+                // 초기 데이터베이스가 비어있을 때 생성되는 예시 데이터에서도 빈칸 생성을 완전히 없앴습니다.
                 universities = [{
                     id: 1,
                     name: '한국대',
@@ -214,7 +223,7 @@
                         2027: { quota: 20 }
                     },
                     cutStandards: { '50': false, '70': true, '90': false, '100': false },
-                    rates2027: generateDefaultTimeslots()
+                    rates2027: [] // 텅 빈 배열부터 시작!
                 }];
                 saveToStorage();
             }
@@ -267,20 +276,57 @@
             reader.readAsText(file);
         }
 
-        function generateDefaultTimeslots() {
-            const slots = [];
-            const dates = ['09/07', '09/08', '09/09', '09/10', '09/11'];
-            const hours = ['09:00', '12:00', '15:00', '18:00', '21:00'];
-            
-            dates.forEach(date => {
-                hours.forEach(hour => {
-                    if(date === '09/11' && hour > '18:00') return;
-                    if(date !== '09/11' || hour <= '18:00') {
-                        slots.push({ time: `${date} ${hour}`, rate: '' });
-                    }
-                });
+        function selectDateCheckbox(selectedCheckbox) {
+            ['09/07', '09/08', '09/09', '09/10', '09/11'].forEach(d => {
+                const cb = document.getElementById(`date-chk-${d}`);
+                if (cb && cb !== selectedCheckbox) cb.checked = false;
             });
-            return slots;
+        }
+
+        // 실시간 시간 + 날짜로 쏙쏙 박스를 생성하는 함수
+        function addDynamicRateRealtime() {
+            const u = universities.find(item => item.id === selectedId);
+            if(!u) return;
+
+            const dates = ['09/07', '09/08', '09/09', '09/10', '09/11'];
+            let chosenDate = '';
+            for (let d of dates) {
+                const cb = document.getElementById(`date-chk-${d}`);
+                if (cb && cb.checked) {
+                    chosenDate = d;
+                    break;
+                }
+            }
+
+            if (!chosenDate) {
+                alert('입력할 날짜(9/7 ~ 9/11 중 하나)를 먼저 체크해주세요.');
+                return;
+            }
+
+            const rateInputEl = document.getElementById('quick-rate-input');
+            const rateVal = rateInputEl.value;
+
+            if (!rateVal) {
+                alert('경쟁률 숫자를 입력해주세요.');
+                return;
+            }
+
+            if(!u.rates2027) u.rates2027 = [];
+
+            // PC의 실시간 시간 자동 기록 (HH:MM)
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const currentTimeStr = `${hours}:${minutes}`;
+
+            const fullDateTime = `${chosenDate} ${currentTimeStr}`;
+            
+            u.rates2027.push({ time: fullDateTime, rate: rateVal });
+            u.rates2027.sort((a, b) => a.time.localeCompare(b.time));
+
+            rateInputEl.value = '';
+            saveToStorage();
+            renderDetail();
         }
 
         function renderList() {
@@ -337,59 +383,50 @@
                 .join(', ');
             const minHeaderText = checkedCuts ? `최저 (${checkedCuts})` : '최저';
 
-            if (!u.rates2027) u.rates2027 = generateDefaultTimeslots();
+            if (!u.rates2027) u.rates2027 = [];
             u.rates2027.sort((a, b) => a.time.localeCompare(b.time));
 
-            // ★ 가장 최근에 입력된 실시간 경쟁률과 시간 찾기
             let latestRateText = '집계 중';
             if (u.rates2027 && u.rates2027.length > 0) {
-                // 입력된 값이 있는 항목들만 필터링
                 const filledSlots = u.rates2027.filter(s => s.rate !== '' && s.rate !== null && s.rate !== undefined);
                 if (filledSlots.length > 0) {
-                    // 시간순 정렬 중 마지막 항목이 가장 최근 시간
                     const latest = filledSlots[filledSlots.length - 1];
                     latestRateText = `${latest.rate}:1 <span class="text-xs font-normal text-gray-500">(${latest.time})</span>`;
                 }
             }
 
-            const groupedSlots = {};
-            u.rates2027.forEach((slot, index) => {
-                const parts = slot.time.trim().split(' ');
-                let dateKey = '미분류';
-                let timeDisplay = slot.time;
-                if(parts.length >= 2) {
-                    dateKey = parts[0];
-                    timeDisplay = parts.slice(1).join(' '); 
-                }
-                if (!groupedSlots[dateKey]) groupedSlots[dateKey] = [];
-                groupedSlots[dateKey].push({ rate: slot.rate, originalIndex: index, timeDisplay: timeDisplay });
-            });
-
-            const dateKeys = Object.keys(groupedSlots);
-            const gridColsClass = dateKeys.length === 1 ? 'grid-cols-1' :
-                                  dateKeys.length === 2 ? 'grid-cols-2' :
-                                  dateKeys.length === 3 ? 'grid-cols-3' :
-                                  dateKeys.length === 4 ? 'grid-cols-4' : 'grid-cols-5';
-
-            const groupedHtml = dateKeys.map(date => `
-                <div class="bg-gray-50/50 border border-gray-200 rounded-xl p-3 flex flex-col gap-2 min-w-0">
-                    <div class="text-center text-sm font-bold text-gray-700 border-b border-gray-200 pb-2">${date}</div>
-                    <div class="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
-                        ${groupedSlots[date].map(item => `
-                            <div class="bg-white border border-gray-200 p-2.5 rounded-lg flex flex-col gap-1.5 shadow-sm">
-                                <div class="flex justify-between items-center text-xs text-indigo-600 font-semibold">
-                                    <span>${item.timeDisplay}</span>
-                                    <button onclick="removeSlot(${item.originalIndex})" class="text-gray-300 hover:text-red-500 transition">&times;</button>
-                                </div>
-                                <div class="flex items-center gap-1">
-                                    <input type="number" step="0.01" value="${item.rate}" onchange="updateRate2027(${item.originalIndex}, this.value)" placeholder="경쟁률 입력" class="w-full bg-gray-50 border border-gray-200 rounded-md px-2 py-1.5 text-sm text-center focus:outline-none focus:bg-white focus:ring-1 focus:ring-indigo-500">
-                                    <span class="text-xs text-gray-400">:1</span>
-                                </div>
-                            </div>
-                        `).join('')}
+            // 5개의 기둥을 만들어두고, "입력된" 박스만 해당 날짜 아래에 카드형태로 생성되게 합니다.
+            const allDates = ['09/07', '09/08', '09/09', '09/10', '09/11'];
+            
+            const groupedHtml = allDates.map(date => {
+                // 해당 날짜에 추가된(입력된) 항목만 골라냄
+                const slotsForDate = u.rates2027.filter(s => s.time.startsWith(date));
+                
+                return `
+                    <div class="bg-gray-50/50 border border-gray-200 rounded-xl p-3 flex flex-col gap-2 min-w-0">
+                        <div class="text-center text-sm font-bold text-gray-700 border-b border-gray-200 pb-2">${date}</div>
+                        <div class="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                            ${slotsForDate.length > 0 ? slotsForDate.map(item => {
+                                const timeDisplay = item.time.split(' ')[1] || '';
+                                const originalIndex = u.rates2027.indexOf(item);
+                                // 사용자가 추가할 때만 이 박스가 생성됩니다.
+                                return `
+                                    <div class="bg-white border border-gray-200 p-2.5 rounded-lg flex flex-col gap-1.5 shadow-sm">
+                                        <div class="flex justify-between items-center text-xs text-indigo-600 font-semibold">
+                                            <span>${timeDisplay}</span>
+                                            <button onclick="removeSlot(${originalIndex})" class="text-gray-300 hover:text-red-500 transition">&times;</button>
+                                        </div>
+                                        <div class="flex items-center gap-1">
+                                            <input type="number" step="0.01" value="${item.rate}" onchange="updateRate2027(${originalIndex}, this.value)" placeholder="경쟁률" class="w-full bg-gray-50 border border-gray-200 rounded-md px-2 py-1.5 text-sm text-center focus:outline-none focus:bg-white focus:ring-1 focus:ring-indigo-500">
+                                            <span class="text-xs text-gray-400">:1</span>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('') : '<div class="text-center text-xs text-gray-400 py-4">입력 대기중</div>'}
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
 
             const tagObj = u.tags || { high: false, fit: false, safe: false };
             let tagText = '';
@@ -426,7 +463,6 @@
                                 <tr class="bg-indigo-50/30 font-bold text-indigo-600">
                                     <td class="p-3">2027학년도</td>
                                     <td class="p-3">${u.history[2027].quota ? u.history[2027].quota + '명' : '-'}</td>
-                                    <!-- ★ 실제 최근 입력된 실시간 경쟁률과 시간 표시 -->
                                     <td class="p-3 font-semibold text-indigo-600" colspan="4">${latestRateText}</td>
                                 </tr>
                                 ${[2026, 2025, 2024].map(yr => `
@@ -465,12 +501,29 @@
                     </div>
                 </div>
 
+                <!-- 2027 시간대별 경쟁률 입력 폼 & 기둥 -->
                 <div class="space-y-4 pt-4 border-t">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-sm font-bold text-gray-700">2027 시간대별 경쟁률 입력</h3>
-                        <button onclick="addCustomSlot()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg font-medium transition">+ 시간대 추가</button>
+                    <h3 class="text-sm font-bold text-gray-700">2027 시간대별 경쟁률 실시간 입력</h3>
+                    
+                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
+                        <div class="flex flex-wrap items-center gap-4 text-xs font-semibold text-gray-700">
+                            <span>날짜 선택:</span>
+                            <label class="flex items-center gap-1 cursor-pointer font-normal"><input type="checkbox" id="date-chk-09/07" onclick="selectDateCheckbox(this)" class="accent-indigo-600 w-4 h-4"> 9/7</label>
+                            <label class="flex items-center gap-1 cursor-pointer font-normal"><input type="checkbox" id="date-chk-09/08" onclick="selectDateCheckbox(this)" class="accent-indigo-600 w-4 h-4"> 9/8</label>
+                            <label class="flex items-center gap-1 cursor-pointer font-normal"><input type="checkbox" id="date-chk-09/09" onclick="selectDateCheckbox(this)" class="accent-indigo-600 w-4 h-4"> 9/9</label>
+                            <label class="flex items-center gap-1 cursor-pointer font-normal"><input type="checkbox" id="date-chk-09/10" onclick="selectDateCheckbox(this)" class="accent-indigo-600 w-4 h-4"> 9/10</label>
+                            <label class="flex items-center gap-1 cursor-pointer font-normal"><input type="checkbox" id="date-chk-09/11" onclick="selectDateCheckbox(this)" class="accent-indigo-600 w-4 h-4"> 9/11</label>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-200">
+                            <span class="text-xs font-semibold text-gray-700">실시간 경쟁률:</span>
+                            <input type="number" step="0.01" id="quick-rate-input" placeholder="예: 15.5" class="border border-gray-200 bg-white rounded-lg px-3 py-2 text-sm w-36 text-center focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                            <span class="text-xs text-gray-500">:1</span>
+                            <button onclick="addDynamicRateRealtime()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-4 py-2.5 rounded-lg transition">+ 현재 시간으로 박스 추가</button>
+                        </div>
                     </div>
-                    <div class="grid ${gridColsClass} gap-3 pt-1">
+                    
+                    <!-- 추가할 때마다 이곳의 날짜 기둥 안에 박스가 쏙쏙 생깁니다. -->
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 pt-1">
                         ${groupedHtml}
                     </div>
                 </div>
@@ -753,7 +806,7 @@
                     id: Date.now(),
                     name, type, major, tags, history,
                     cutStandards,
-                    rates2027: generateDefaultTimeslots()
+                    rates2027: []
                 };
                 universities.push(newUniv);
                 selectedId = newUniv.id;
@@ -814,18 +867,6 @@
                 saveToStorage();
                 renderChart(u);
                 renderAllUnivChart();
-            }
-        }
-
-        function addCustomSlot() {
-            const u = universities.find(item => item.id === selectedId);
-            if(u) {
-                const timeInput = prompt("추가할 일자 및 시간대를 입력하세요 (예: 09/11 21:00):");
-                if(timeInput) {
-                    u.rates2027.push({ time: timeInput, rate: '' });
-                    saveToStorage();
-                    renderDetail();
-                }
             }
         }
 
