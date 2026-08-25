@@ -555,12 +555,19 @@
             document.getElementById('univ-modal').classList.add('hidden');
         }
 
-        function handleFormSubmit(event) {
+       function handleFormSubmit(event) {
             event.preventDefault();
             const editId = document.getElementById('edit-id').value;
             const name = document.getElementById('univ-name').value;
             const type = document.getElementById('univ-type').value;
             const major = document.getElementById('univ-major').value;
+
+            // [추가된 부분] 체크박스 값 가져오기
+            const tags = {
+                high: document.getElementById('tag-high').checked,
+                fit: document.getElementById('tag-fit').checked,
+                safe: document.getElementById('tag-safe').checked
+            };
 
             const cutStandards = {
                 '50': document.getElementById('chk-50').checked,
@@ -599,12 +606,13 @@
                 u.name = name;
                 u.type = type;
                 u.major = major;
+                u.tags = tags; // [추가된 부분]
                 u.cutStandards = cutStandards;
                 u.history = history;
             } else {
                 const newUniv = {
                     id: Date.now(),
-                    name, type, major, history,
+                    name, type, major, tags, history, // [추가된 부분]
                     cutStandards,
                     rates2027: generateDefaultTimeslots()
                 };
@@ -613,9 +621,10 @@
             }
 
             saveToStorage();
+            renderList();
+            renderDetail();
             closeModal();
         }
-
         function editUniv(id) {
             const u = universities.find(item => item.id === id);
             if(!u) return;
