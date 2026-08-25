@@ -15,7 +15,7 @@
 
     <style>
         body { background-color: #FAFAFA; }
-        /* 스크롤바 디자인 (일자별 세로 스크롤용) */
+        /* 스크롤바 디자인 */
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 4px; }
@@ -192,6 +192,7 @@
         let universities = [];
         let selectedId = null;
         let chartInstance = null;
+        let allUnivChartInstance = null;
         let isFirstLoad = true;
 
         db.ref('univ_data').on('value', (snapshot) => {
@@ -339,6 +340,18 @@
             if (!u.rates2027) u.rates2027 = generateDefaultTimeslots();
             u.rates2027.sort((a, b) => a.time.localeCompare(b.time));
 
+            // ★ 가장 최근에 입력된 실시간 경쟁률과 시간 찾기
+            let latestRateText = '집계 중';
+            if (u.rates2027 && u.rates2027.length > 0) {
+                // 입력된 값이 있는 항목들만 필터링
+                const filledSlots = u.rates2027.filter(s => s.rate !== '' && s.rate !== null && s.rate !== undefined);
+                if (filledSlots.length > 0) {
+                    // 시간순 정렬 중 마지막 항목이 가장 최근 시간
+                    const latest = filledSlots[filledSlots.length - 1];
+                    latestRateText = `${latest.rate}:1 <span class="text-xs font-normal text-gray-500">(${latest.time})</span>`;
+                }
+            }
+
             const groupedSlots = {};
             u.rates2027.forEach((slot, index) => {
                 const parts = slot.time.trim().split(' ');
@@ -352,8 +365,14 @@
                 groupedSlots[dateKey].push({ rate: slot.rate, originalIndex: index, timeDisplay: timeDisplay });
             });
 
-            const groupedHtml = Object.keys(groupedSlots).map(date => `
-                <div class="min-w-[150px] bg-gray-50/50 border border-gray-200 rounded-xl p-3 flex flex-col gap-2">
+            const dateKeys = Object.keys(groupedSlots);
+            const gridColsClass = dateKeys.length === 1 ? 'grid-cols-1' :
+                                  dateKeys.length === 2 ? 'grid-cols-2' :
+                                  dateKeys.length === 3 ? 'grid-cols-3' :
+                                  dateKeys.length === 4 ? 'grid-cols-4' : 'grid-cols-5';
+
+            const groupedHtml = dateKeys.map(date => `
+                <div class="bg-gray-50/50 border border-gray-200 rounded-xl p-3 flex flex-col gap-2 min-w-0">
                     <div class="text-center text-sm font-bold text-gray-700 border-b border-gray-200 pb-2">${date}</div>
                     <div class="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
                         ${groupedSlots[date].map(item => `
@@ -407,7 +426,8 @@
                                 <tr class="bg-indigo-50/30 font-bold text-indigo-600">
                                     <td class="p-3">2027학년도</td>
                                     <td class="p-3">${u.history[2027].quota ? u.history[2027].quota + '명' : '-'}</td>
-                                    <td class="p-3 text-gray-400" colspan="4">실시간 경쟁률 집계 중</td>
+                                    <!-- ★ 실제 최근 입력된 실시간 경쟁률과 시간 표시 -->
+                                    <td class="p-3 font-semibold text-indigo-600" colspan="4">${latestRateText}</td>
                                 </tr>
                                 ${[2026, 2025, 2024].map(yr => `
                                     <tr>
@@ -434,18 +454,30 @@
                     </div>
                 </div>
 
+                <!-- 2027 접수 대상 대학 실시간 경쟁률 비교 그래프 -->
+                <div class="space-y-3 pt-4 border-t">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-sm font-bold text-gray-700">2027 접수 대상 대학 실시간 경쟁률 비교</h3>
+                        <span class="text-xs text-gray-400">전체 지원 대학 동시 비교</span>
+                    </div>
+                    <div class="bg-gray-50/50 p-4 rounded-2xl border border-gray-100 relative h-[450px]">
+                        <canvas id="allUnivRateChart"></canvas>
+                    </div>
+                </div>
+
                 <div class="space-y-4 pt-4 border-t">
                     <div class="flex justify-between items-center">
                         <h3 class="text-sm font-bold text-gray-700">2027 시간대별 경쟁률 입력</h3>
                         <button onclick="addCustomSlot()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg font-medium transition">+ 시간대 추가</button>
                     </div>
-                    <div class="flex overflow-x-auto gap-4 pb-4 pt-1 px-1">
+                    <div class="grid ${gridColsClass} gap-3 pt-1">
                         ${groupedHtml}
                     </div>
                 </div>
             `;
 
             renderChart(u);
+            renderAllUnivChart();
         }
 
         function renderChart(u) {
@@ -536,7 +568,10 @@
                         padding: { right: 70 }
                     },
                     scales: {
-                        y: { beginAtZero: true, grid: { color: '#f3f4f6' } },
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { color: '#f3f4f6' } 
+                        },
                         x: { grid: { display: false } }
                     },
                     plugins: {
@@ -544,6 +579,90 @@
                     }
                 },
                 plugins: [rightLabelPlugin]
+            });
+        }
+
+        function renderAllUnivChart() {
+            const canvasEl = document.getElementById('allUnivRateChart');
+            if (!canvasEl) return;
+            const ctx = canvasEl.getContext('2d');
+            if (allUnivChartInstance) allUnivChartInstance.destroy();
+
+            const sortedUnivs = [...universities].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+
+            let allTimes = [];
+            sortedUnivs.forEach(u => {
+                if (u.rates2027) {
+                    u.rates2027.forEach(slot => {
+                        if (!allTimes.includes(slot.time)) allTimes.push(slot.time);
+                    });
+                }
+            });
+            allTimes.sort((a, b) => a.localeCompare(b));
+
+            const colors = ['#4f46e5', '#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#8b5cf6', '#ec4899', '#f97316'];
+
+            let maxRate = 5;
+            const datasets = sortedUnivs.map((u, index) => {
+                const color = colors[index % colors.length];
+                const dataMap = {};
+                if (u.rates2027) {
+                    u.rates2027.forEach(slot => {
+                        const val = slot.rate ? parseFloat(slot.rate) : null;
+                        dataMap[slot.time] = val;
+                        if (val !== null && val > maxRate) maxRate = val;
+                    });
+                }
+                const data = allTimes.map(t => dataMap[t] !== undefined ? dataMap[t] : null);
+
+                return {
+                    label: `${u.name} (${u.major})`,
+                    data: data,
+                    borderColor: color,
+                    backgroundColor: color,
+                    borderWidth: 2.5,
+                    tension: 0.2,
+                    spanGaps: true,
+                };
+            });
+
+            let suggestedMax = Math.ceil((maxRate + 2) / 5) * 5;
+            if (suggestedMax < 10) suggestedMax = 10;
+
+            allUnivChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: allTimes,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    layout: {
+                        padding: { right: 20 }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true, 
+                            max: suggestedMax,
+                            ticks: { 
+                                stepSize: 5 
+                            }, 
+                            grid: { color: '#f3f4f6' } 
+                        },
+                        x: { grid: { display: false } }
+                    },
+                    plugins: {
+                        legend: { 
+                            position: 'bottom', 
+                            labels: { 
+                                font: { size: 10 }, 
+                                boxWidth: 12,
+                                padding: 15
+                            } 
+                        }
+                    }
+                }
             });
         }
 
@@ -693,6 +812,8 @@
             if(u) {
                 u.rates2027[index].rate = value;
                 saveToStorage();
+                renderChart(u);
+                renderAllUnivChart();
             }
         }
 
@@ -703,6 +824,7 @@
                 if(timeInput) {
                     u.rates2027.push({ time: timeInput, rate: '' });
                     saveToStorage();
+                    renderDetail();
                 }
             }
         }
@@ -712,6 +834,7 @@
             if(u) {
                 u.rates2027.splice(index, 1);
                 saveToStorage();
+                renderDetail();
             }
         }
     </script>
