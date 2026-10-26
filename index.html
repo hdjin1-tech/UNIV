@@ -853,11 +853,16 @@
         }
 
         function deleteUniv(id) {
-            if(confirm('정말 삭제하시겠습니까?')) {
-                universities = universities.filter(item => item.id !== id);
-                if(selectedId === id) {
-                    selectedId = universities.length > 0 ? universities[0].id : null;
-                }
-               
+    if(confirm('정말 삭제하시겠습니까?')) {
+        universities = universities.filter(item => item.id !== id);
+        if(selectedId === id) {
+            selectedId = universities.length > 0 ? universities[0].id : null;
+        }
+        saveToStorage();
+        renderList();
+        renderDetail();
+    }
+}
+</script>
 </body>
 </html>
